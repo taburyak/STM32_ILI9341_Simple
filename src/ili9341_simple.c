@@ -4,8 +4,7 @@
  *  Created on: 15 ����. 2019 �.
  *      Author: tabur
  */
-#include "../../ILI9341_SIMPLE/inc/ili9341_light.h"
-
+#include <ili9341_simple.h>
 #include "main.h"
 #include <stdbool.h>
 
