@@ -1,7 +1,7 @@
 /*
  * ili9341_light.h
  *
- *  Created on: 15 ����. 2019 �.
+ *  Created on: 15 may. 2019.
  *      Author: tabur
  */
 
