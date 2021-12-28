@@ -27,13 +27,21 @@ static lcdPropertiesTypeDef  lcdProperties = { ILI9341_PIXEL_WIDTH, ILI9341_PIXE
 // Write an 8 bit command to the IC driver
 static void lcdWriteCommand(unsigned char command)
 {
+#ifdef USE_SPI_BUS
+
+#else
 	LCD_CmdWrite(command);
+#endif /* USE_SPI_BUS */
 }
 
 // Write an 16 bit data word to the IC driver
 static void lcdWriteData(unsigned short data)
 {
+#ifdef USE_SPI_BUS
+
+#else
 	LCD_DataWrite(data);
+#endif /* USE_SPI_BUS */
 }
 
 static void lcdReset(void)

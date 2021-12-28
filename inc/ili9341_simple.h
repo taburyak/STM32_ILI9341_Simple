@@ -10,6 +10,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "main.h"
+
+#define USE_SPI_BUS
 
 /*---------------------------------------------------------------------*/
 // Register names from Peter Barrett's Microtouch code
@@ -113,10 +116,27 @@
 #define LCD_BASE0        		((uint32_t)0x6C000000)
 #define LCD_BASE1        		((uint32_t)0x6C002000)
 
+#ifdef USE_SPI_BUS
+
+extern SPI_HandleTypeDef hspi2;
+#define LCD_SPI_PORT hi2c2
+
+#define LCD_DC_H() HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET)
+#define LCD_DC_L() HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_RESET)
+#define LCD_CS_H() HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_SET)
+#define LCD_CS_L() HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET)
+#define LCD_RES_H() HAL_GPIO_WritePin(LCD_RES_GPIO_Port, LCD_RES_Pin, GPIO_PIN_SET)
+#define LCD_RES_L() HAL_GPIO_WritePin(LCD_RES_GPIO_Port, LCD_RES_Pin, GPIO_PIN_RESET)
+
+#else
+
 #define LCD_CmdWrite(command)	*(volatile uint16_t *) (LCD_BASE0) = (command)
 #define LCD_DataWrite(data)		*(volatile uint16_t *) (LCD_BASE1) = (data)
 #define	LCD_StatusRead()		*(volatile uint16_t *) (LCD_BASE0) //if use read  Mcu interface DB0~DB15 needs increase pull high
 #define	LCD_DataRead()			*(volatile uint16_t *) (LCD_BASE1) //if use read  Mcu interface DB0~DB15 needs increase pull high
+
+#endif /* USE_SPI_BUS */
+
 
 #define LCD_BL_ON() HAL_GPIO_WritePin(LCD_BL_GPIO_Port, LCD_BL_Pin, GPIO_PIN_SET)
 #define LCD_BL_OFF() HAL_GPIO_WritePin(LCD_BL_GPIO_Port, LCD_BL_Pin, GPIO_PIN_RESET)
