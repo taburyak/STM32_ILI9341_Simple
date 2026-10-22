@@ -142,7 +142,9 @@ typedef struct
   bool					hwscrolling;   // Whether the LCD support HW scrolling
 } lcdPropertiesTypeDef;
 
+uint16_t lcdReadID(void);
 void lcdInit(void);
+
 void lcdBacklightOff(void);
 void lcdBacklightOn(void);
 void lcdSetOrientation(lcdOrientationTypeDef orientation);

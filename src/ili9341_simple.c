@@ -60,7 +60,20 @@ static unsigned char lcdBuildMemoryAccessControlConfig(
   return value;
 }
 
+uint16_t lcdReadID(void)
+{
+	uint16_t id;
+	lcdWriteCommand(0xD3);
+	(void)LCD_DataRead(); // Dummy read
+	(void)LCD_DataRead(); // Skip 0x00
+	id = LCD_DataRead() << 8; // Read 0x93
+	id |= LCD_DataRead();     // Read 0x41
+	return id;
+}
+
+
 void lcdInit(void)
+
 {
   lcdPortraitConfig = lcdBuildMemoryAccessControlConfig(
                                                     MemoryAccessControlNormalOrder,		// rowAddressOrder
