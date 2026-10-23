@@ -23,6 +23,8 @@ static unsigned char lcdPortraitMirrorConfig = 0;
 static unsigned char lcdLandscapeMirrorConfig = 0;
 static lcdPropertiesTypeDef  lcdProperties = { ILI9341_PIXEL_WIDTH, ILI9341_PIXEL_HEIGHT, LCD_ORIENTATION_PORTRAIT, true, true };
 
+extern DMA_HandleTypeDef hdma_memtomem_dma2_stream0;
+
 // Write an 8 bit command to the IC driver
 static void lcdWriteCommand(unsigned char command)
 {
@@ -310,3 +312,32 @@ void lcdTest(void)
 		}
 	}
 }
+
+void lcdFlushFrameBufferDMA(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t pixels_count)
+{
+    if (hdma == NULL || buffer == NULL || pixels_count == 0)
+    {
+        return;
+    }
+
+    /* 1. Вказуємо дисплею команду початку запису в пам'ять (RAMWR = 0x2C) */
+    LCD_CmdWrite(ILI9341_MEMORYWRITE);
+
+    /* 2. Відправляємо масив пікселів порціями по <= 60000 елементів через DMA */
+    uint32_t transferred = 0;
+    while (pixels_count > 0)
+    {
+        uint32_t chunk = (pixels_count > 60000) ? 60000 : pixels_count;
+
+        HAL_DMA_Start(hdma,
+                      (uint32_t)(buffer + transferred),
+                      (uint32_t)LCD_BASE1,
+                      chunk);
+
+        HAL_DMA_PollForTransfer(hdma, HAL_DMA_FULL_TRANSFER, HAL_MAX_DELAY);
+
+        transferred += chunk;
+        pixels_count -= chunk;
+    }
+}
+

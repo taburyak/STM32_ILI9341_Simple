@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "main.h"
 
 /*---------------------------------------------------------------------*/
 // Register names from Peter Barrett's Microtouch code
@@ -148,6 +149,13 @@ void lcdBacklightOn(void);
 void lcdSetOrientation(lcdOrientationTypeDef orientation);
 void lcdSetWindow(unsigned short x0, unsigned short y0, unsigned short x1, unsigned short y1);
 void lcdTest(void);
+/**
+ * @brief Fast buffer output to the LCD via DMA (bypassing 64K DMA limit)
+ * @param hdma Pointer to the configured DMA handle (e.g. &hdma_memtomem_dma2_stream0)
+ * @param buffer Pointer to pixel buffer (RGB565 uint16_t)
+ * @param pixels_count Total number of pixels to transfer
+ */
+void lcdFlushFrameBufferDMA(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t pixels_count);
 /*---------------------------------------------------------------------*/
 
 #endif /* LI9341_LIGHT_H_ */
