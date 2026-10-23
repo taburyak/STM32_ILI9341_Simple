@@ -1,7 +1,6 @@
 /*
  * ili9341_light.c
- *
- *  Created on: 15 ����. 2019 �.
+ *  Created on: 2023-08-15
  *      Author: tabur
  */
 #include <ili9341_simple.h>
@@ -50,13 +49,13 @@ static unsigned char lcdBuildMemoryAccessControlConfig(
                         bool colorOrder,
                         bool horizontalRefreshOrder)
 {
-  unsigned char value 				= 0;
+  unsigned char value 				      = 0;
   if(horizontalRefreshOrder) value 	|= ILI9341_MADCTL_MH;
-  if(colorOrder) value 				|= ILI9341_MADCTL_BGR;
-  if(verticalRefreshOrder) value 	|= ILI9341_MADCTL_ML;
-  if(rowColumnExchange) value 		|= ILI9341_MADCTL_MV;
-  if(columnAddressOrder) value 		|= ILI9341_MADCTL_MX;
-  if(rowAddressOrder) value 		|= ILI9341_MADCTL_MY;
+  if(colorOrder) value 				      |= ILI9341_MADCTL_BGR;
+  if(verticalRefreshOrder) value 	  |= ILI9341_MADCTL_ML;
+  if(rowColumnExchange) value 		  |= ILI9341_MADCTL_MV;
+  if(columnAddressOrder) value 		  |= ILI9341_MADCTL_MX;
+  if(rowAddressOrder) value 		    |= ILI9341_MADCTL_MY;
   return value;
 }
 
@@ -64,16 +63,14 @@ uint16_t lcdReadID(void)
 {
 	uint16_t id;
 	lcdWriteCommand(0xD3);
-	(void)LCD_DataRead(); // Dummy read
-	(void)LCD_DataRead(); // Skip 0x00
+	(void)LCD_DataRead();     // Dummy read
+	(void)LCD_DataRead();     // Skip 0x00
 	id = LCD_DataRead() << 8; // Read 0x93
 	id |= LCD_DataRead();     // Read 0x41
 	return id;
 }
 
-
 void lcdInit(void)
-
 {
   lcdPortraitConfig = lcdBuildMemoryAccessControlConfig(
                                                     MemoryAccessControlNormalOrder,		// rowAddressOrder
