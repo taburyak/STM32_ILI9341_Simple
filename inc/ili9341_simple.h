@@ -156,6 +156,30 @@ void lcdTest(void);
  * @param pixels_count Total number of pixels to transfer
  */
 void lcdFlushFrameBufferDMA(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t pixels_count);
+
+/**
+ * @brief Start non-blocking buffer output to the LCD via DMA interrupt (<= 65535 pixels)
+ * @param hdma Pointer to the configured DMA handle
+ * @param buffer Pointer to pixel buffer (RGB565 uint16_t)
+ * @param pixels_count Number of pixels to transfer (must be <= 65535)
+ * @retval true if DMA transfer was started, false on invalid args or busy stream
+ */
+bool lcdFlushFrameBufferDMA_IT(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t pixels_count);
+
+/**
+ * @brief Fill the currently active LCD GRAM window with a constant RGB565 color via DMA2 M2M
+ *        (temporarily disables source address increment PINC and restores it afterwards).
+ * @param hdma Pointer to the configured DMA handle
+ * @param color RGB565 color value
+ * @param pixels_count Total number of pixels to fill
+ */
+void lcdFillConstantDMA(DMA_HandleTypeDef *hdma, uint16_t color, uint32_t pixels_count);
+
+/**
+ * @brief Wait until any in-flight DMA transfer on the LCD stream completes.
+ * @param hdma Pointer to the configured DMA handle
+ */
+void lcdWaitDMAIdle(DMA_HandleTypeDef *hdma);
 /*---------------------------------------------------------------------*/
 
 #endif /* LI9341_LIGHT_H_ */

@@ -320,10 +320,12 @@ void lcdFlushFrameBufferDMA(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t 
         return;
     }
 
-    /* 1. Вказуємо дисплею команду початку запису в пам'ять (RAMWR = 0x2C) */
+    lcdWaitDMAIdle(hdma);
+
+    /* 1. Issue RAMWR (0x2C) command to start writing into GRAM */
     LCD_CmdWrite(ILI9341_MEMORYWRITE);
 
-    /* 2. Відправляємо масив пікселів порціями по <= 60000 елементів через DMA */
+    /* 2. Transfer pixel buffer in chunks of <= 60000 halfwords via DMA */
     uint32_t transferred = 0;
     while (pixels_count > 0)
     {
@@ -339,5 +341,77 @@ void lcdFlushFrameBufferDMA(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t 
         transferred += chunk;
         pixels_count -= chunk;
     }
+}
+
+void lcdWaitDMAIdle(DMA_HandleTypeDef *hdma)
+{
+    if (hdma == NULL)
+    {
+        return;
+    }
+
+    uint32_t start = HAL_GetTick();
+    while (HAL_DMA_GetState(hdma) == HAL_DMA_STATE_BUSY)
+    {
+        if ((HAL_GetTick() - start) > 100U)
+        {
+            (void)HAL_DMA_Abort(hdma);
+            break;
+        }
+    }
+}
+
+bool lcdFlushFrameBufferDMA_IT(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t pixels_count)
+{
+    if (hdma == NULL || buffer == NULL || pixels_count == 0U || pixels_count > 65535U)
+    {
+        return false;
+    }
+
+    lcdWaitDMAIdle(hdma);
+    LCD_CmdWrite(ILI9341_MEMORYWRITE);
+
+    if (HAL_DMA_Start_IT(hdma, (uint32_t)buffer, (uint32_t)LCD_BASE1, pixels_count) != HAL_OK)
+    {
+        return false;
+    }
+    return true;
+}
+
+/* DMA source variable in internal SRAM (never in CCM or on a task stack) */
+static volatile uint16_t s_dma_fill_color __attribute__((aligned(4))) = 0U;
+
+void lcdFillConstantDMA(DMA_HandleTypeDef *hdma, uint16_t color, uint32_t pixels_count)
+{
+    if (hdma == NULL || pixels_count == 0U)
+    {
+        return;
+    }
+
+    lcdWaitDMAIdle(hdma);
+    s_dma_fill_color = color;
+    __DSB();
+
+    LCD_CmdWrite(ILI9341_MEMORYWRITE);
+
+    /* Temporarily disable source increment (PINC) so DMA reads s_dma_fill_color repeatedly */
+    hdma->Instance->CR &= ~DMA_SxCR_PINC;
+
+    while (pixels_count > 0U)
+    {
+        uint32_t chunk = (pixels_count > 60000U) ? 60000U : pixels_count;
+
+        HAL_DMA_Start(hdma,
+                      (uint32_t)&s_dma_fill_color,
+                      (uint32_t)LCD_BASE1,
+                      chunk);
+
+        HAL_DMA_PollForTransfer(hdma, HAL_DMA_FULL_TRANSFER, HAL_MAX_DELAY);
+        pixels_count -= chunk;
+    }
+
+    /* Restore source increment for normal buffer flushes */
+    hdma->Instance->CR |= DMA_SxCR_PINC;
+    __DSB();
 }
 
