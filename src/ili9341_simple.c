@@ -325,7 +325,10 @@ void lcdFlushFrameBufferDMA(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t 
     /* 1. Issue RAMWR (0x2C) command to start writing into GRAM */
     LCD_CmdWrite(ILI9341_MEMORYWRITE);
 
-    /* 2. Transfer pixel buffer in chunks of <= 60000 halfwords via DMA */
+    /* 2. Transfer pixel buffer in chunks of <= 60000 halfwords via DMA (clear XferCpltCallback so polling works) */
+    void (*saved_cb)(DMA_HandleTypeDef *) = hdma->XferCpltCallback;
+    hdma->XferCpltCallback = NULL;
+
     uint32_t transferred = 0;
     while (pixels_count > 0)
     {
@@ -341,6 +344,8 @@ void lcdFlushFrameBufferDMA(DMA_HandleTypeDef *hdma, uint16_t *buffer, uint32_t 
         transferred += chunk;
         pixels_count -= chunk;
     }
+
+    hdma->XferCpltCallback = saved_cb;
 }
 
 void lcdWaitDMAIdle(DMA_HandleTypeDef *hdma)
@@ -394,6 +399,10 @@ void lcdFillConstantDMA(DMA_HandleTypeDef *hdma, uint16_t color, uint32_t pixels
 
     LCD_CmdWrite(ILI9341_MEMORYWRITE);
 
+    /* Temporarily clear XferCpltCallback so HAL_DMA_PollForTransfer is allowed by STM32 HAL */
+    void (*saved_cb)(DMA_HandleTypeDef *) = hdma->XferCpltCallback;
+    hdma->XferCpltCallback = NULL;
+
     /* Temporarily disable source increment (PINC) so DMA reads s_dma_fill_color repeatedly */
     hdma->Instance->CR &= ~DMA_SxCR_PINC;
 
@@ -410,8 +419,81 @@ void lcdFillConstantDMA(DMA_HandleTypeDef *hdma, uint16_t color, uint32_t pixels
         pixels_count -= chunk;
     }
 
-    /* Restore source increment for normal buffer flushes */
+    /* Restore source increment and LVGL completion callback */
     hdma->Instance->CR |= DMA_SxCR_PINC;
+    hdma->XferCpltCallback = saved_cb;
+    __DSB();
+}
+
+void lcdReadPixelsRGB565(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t *dst)
+{
+    if (dst == NULL || w == 0U || h == 0U)
+    {
+        return;
+    }
+
+    lcdWaitDMAIdle(&hdma_memtomem_dma2_stream0);
+
+    /* ILI9341 GRAM read (0x2E, t_RATFM <= 340 ns) is much slower than GRAM write (t_WC >= 66 ns).
+     * Temporarily widen FSMC Bank 4 read timing (ADDSET=6, DATAST=36, BUSTURN=4 -> ~250 ns)
+     * so the controller outputs valid RGB666 bytes without bus lockup. */
+    uint32_t saved_btr = FSMC_Bank1->BTCR[7];
+    FSMC_Bank1->BTCR[7] = (saved_btr & ~(0xFFUL | (0xFFUL << 8) | (0x0FUL << 16))) |
+                          (6UL << 0) | (36UL << 8) | (4UL << 16);
+    __DSB();
+
+    uint16_t x1 = (uint16_t)(x0 + w - 1U);
+    uint16_t y1 = (uint16_t)(y0 + h - 1U);
+
+    lcdWriteCommand(ILI9341_COLADDRSET);
+    lcdWriteData((x0 >> 8) & 0xFFU);
+    lcdWriteData(x0 & 0xFFU);
+    lcdWriteData((x1 >> 8) & 0xFFU);
+    lcdWriteData(x1 & 0xFFU);
+
+    lcdWriteCommand(ILI9341_PAGEADDRSET);
+    lcdWriteData((y0 >> 8) & 0xFFU);
+    lcdWriteData(y0 & 0xFFU);
+    lcdWriteData((y1 >> 8) & 0xFFU);
+    lcdWriteData(y1 & 0xFFU);
+
+    /* Issue RAMRD (0x2E): first read is a dummy cycle, followed by packed R8G8 / B8R8 / G8B8 */
+    lcdWriteCommand(ILI9341_MEMORYREAD);
+    (void)LCD_DataRead();
+
+    uint32_t total = (uint32_t)w * (uint32_t)h;
+    uint32_t idx   = 0U;
+    while ((idx + 1U) < total)
+    {
+        uint16_t w0 = LCD_DataRead(); /* R0[15:8], G0[7:0] */
+        uint16_t w1 = LCD_DataRead(); /* B0[15:8], R1[7:0] */
+        uint16_t w2 = LCD_DataRead(); /* G1[15:8], B1[7:0] */
+
+        uint8_t r0 = (uint8_t)(w0 >> 8);
+        uint8_t g0 = (uint8_t)(w0 & 0xFFU);
+        uint8_t b0 = (uint8_t)(w1 >> 8);
+
+        uint8_t r1 = (uint8_t)(w1 & 0xFFU);
+        uint8_t g1 = (uint8_t)(w2 >> 8);
+        uint8_t b1 = (uint8_t)(w2 & 0xFFU);
+
+        dst[idx]      = (uint16_t)(((r0 & 0xF8U) << 8) | ((g0 & 0xFCU) << 3) | (b0 >> 3));
+        dst[idx + 1U] = (uint16_t)(((r1 & 0xF8U) << 8) | ((g1 & 0xFCU) << 3) | (b1 >> 3));
+        idx += 2U;
+    }
+
+    if (idx < total)
+    {
+        uint16_t w0 = LCD_DataRead();
+        uint16_t w1 = LCD_DataRead();
+        uint8_t r0 = (uint8_t)(w0 >> 8);
+        uint8_t g0 = (uint8_t)(w0 & 0xFFU);
+        uint8_t b0 = (uint8_t)(w1 >> 8);
+        dst[idx] = (uint16_t)(((r0 & 0xF8U) << 8) | ((g0 & 0xFCU) << 3) | (b0 >> 3));
+    }
+
+    /* Restore fast FSMC Bank 4 write timing */
+    FSMC_Bank1->BTCR[7] = saved_btr;
     __DSB();
 }
 

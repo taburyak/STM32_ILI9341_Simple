@@ -180,6 +180,17 @@ void lcdFillConstantDMA(DMA_HandleTypeDef *hdma, uint16_t color, uint32_t pixels
  * @param hdma Pointer to the configured DMA handle
  */
 void lcdWaitDMAIdle(DMA_HandleTypeDef *hdma);
+
+/**
+ * @brief Read a rectangle of pixels from ILI9341 GRAM (0x2E Memory Read) and convert
+ *        from 18-bit RGB666 to 16-bit RGB565.
+ * @param x0   Start X (0..319)
+ * @param y0   Start Y (0..239)
+ * @param w    Width in pixels
+ * @param h    Height in pixels
+ * @param dst  Destination buffer (w * h uint16_t RGB565 pixels)
+ */
+void lcdReadPixelsRGB565(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t *dst);
 /*---------------------------------------------------------------------*/
 
 #endif /* LI9341_LIGHT_H_ */
